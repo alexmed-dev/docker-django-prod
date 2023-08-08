@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  web:
+    image: almeddock/mydjangoproject:web1
+    command: gunicorn docker_django.wsgi:application --bind 0.0.0.0:8080
+    volumes:
+      - ./app/:/usr/src/app/
+      - static_volume:/home/app/web/staticfiles
+    expose:
+      - 8080
+      # можно создать файл ./.env.dev и перенести в него переменные окружения
+    # env_file:
+    #   - ./.env.dev
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=foo
+      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+      - SQL_ENGINE=django.db.backends.postgresql
+      - SQL_DATABASE=docker_django_dev
+      - SQL_USER=docker_django
+      - SQL_PASSWORD=docker_django
+      - SQL_HOST=db
+      - SQL_PORT=5432
+      - DATABASE=postgres
+
+      # при первом запуске котейнеров укажите NEWDB=1 (по умолчанию), чтобы при запуске контейнера выполялась миграция и создавался пользователь-админ
+      # при повторном запуске можно указать NEWDB=0, чтобы продолжить работу с существующей БД и пользователем-админом
+      # !!! ВНИМАНИЕ !!! БД и админ уже должны быть созданы (NEWDB=1) при первом запуске контейнеров
+      - NEWDB=1
+
+      # данные для создания ползователя в новой БД для авторизации в админке по адресу http://localhost:8000/admin/
+      # используется только при NEWDB=1 (при NEWDB=0 игнорируется)
+      - DJANGO_SUPERUSER_USERNAME=admin
+      - DJANGO_SUPERUSER_EMAIL=admin@example.com
+      - DJANGO_SUPERUSER_PASSWORD=secret
+    depends_on:
+      - db
+  db:
+    image: postgres:13.0-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=docker_django
+      - POSTGRES_PASSWORD=docker_django
+      - POSTGRES_DB=docker_django_dev
+  nginx:
+    image: almeddock/mydjangoproject:nginx1
+    ports:
+      - 8000:80
+    volumes:
+      - static_volume:/home/app/web/staticfiles
+    depends_on:
+      - web
+volumes:
+  postgres_data:
+  static_volume:
